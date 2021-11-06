@@ -44,11 +44,20 @@ farJumpRefreshSegmentRegs:
 
     sti
 
+    mov byte [dap_ptr + dap.packetSize], 0x18
+    mov word [dap_ptr + dap.sectorsCount], 0x10
+    mov word [dap_ptr + dap.bufferSegment], 0x0
+    mov word [dap_ptr + dap.bufferOffset], kernel
+    mov byte [dap_ptr + dap.startLBA], 0x0
+
+    call diskOps.LBARead
+
     call getMmap
 
     jmp $
 
 %include "mmap.asm"
+%include "disk.asm"
 %include "gdt.asm"
 
 error:
@@ -60,3 +69,26 @@ times 510-($-$$) db 0
 
 ; Boot Signature
 dw 0xaa55
+
+; Apparently Qemu's TCG only seed a sector on KVM if it has a boot signature...
+; Bug??
+kernel:
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+; Pad till 510th byte
+times 1022-($-$$) db 0
+
+; Boot Signature
+dw 0xaa55
+
