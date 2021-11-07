@@ -62,7 +62,7 @@ diskOps:
     mov ch, 0x0
 
     ; Select which sector to read on the track
-    mov cl, 0x2
+    mov cl, byte [dap_ptr + dap.startLBA]
 
     ; Select head number
     mov dh, 0x0
@@ -71,7 +71,7 @@ diskOps:
     int 0x13
 
     ; If the Carry Flag is set, it means there was an error - retry read
-    jc .CHSRead
+    jc error
 
     ret
 
@@ -101,7 +101,7 @@ diskOps:
     ; Call BIOS function
     int 0x13
 
-    ; If Carry Flag is set, it means we got an error - retry reading
+    ; If Carry Flag is set, it means we got an error - fallback on CHS reading
     jc .CHSRead
 
     ret

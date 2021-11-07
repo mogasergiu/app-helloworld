@@ -6,15 +6,4 @@ if test $# -ne 1; then
 fi
 
 kvm_image="$1"
-# qemu_script="/home/blaurentiu/workspace/kraft/scripts/qemu-guest"
-bridge_iface="virbr0"
-bridge_ip="172.44.0.1"
-vm_ip="172.44.0.2"
-
-echo "Creating bridge $bridge_iface with IP address $bridge_ip ..."
-sudo brctl addbr "$bridge_iface" || true
-sudo ifconfig "$bridge_iface" "$bridge_ip"
-
-echo "Starting KVM image connected to bridge interface $bridge_iface ..."
-# "$qemu_script" -k "$kvm_image" -b "$bridge_iface" -m 4096 -a "netdev.ipv4_addr=172.44.0.2 netdev.ipv4_gw_addr=172.44.0.1 netdev.ipv4_subnet_mask=255.255.255.0 --"
-sudo qemu-system-x86_64 -hda "$kvm_image" -cpu host -enable-kvm -nographic
+sudo qemu-system-x86_64 -hda "$kvm_image" -d int --no-reboot

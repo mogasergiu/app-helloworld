@@ -1,6 +1,10 @@
 [BITS 16]
 
 GDT32Start:
+.nullDesc:
+    dd 0x0
+    dd 0x0
+
 .codeDesc:
     dw 0xffff
     dw 0x0000

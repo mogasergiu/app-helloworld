@@ -1,13 +1,6 @@
 [ORG 0x7c00]
 [BITS 16]
 
-struc mmapEntry
-    .baseAddr resq 1
-    .length resq 1
-    .type resd 1
-    .attr resd 1
-endstruc
-
 _start:
     jmp .flyOverBPB
     nop
@@ -17,7 +10,6 @@ times 87 db 0
 
 .flyOverBPB:
     cli
-    cld
 
 ; Various BIOS's may set up cs:ip differently (not the case for sgabios though)
     jmp 0x0:farJumpRefreshSegmentRegs
@@ -25,6 +17,8 @@ times 87 db 0
 %include "multiboot.asm"
 
 multiboot_info_ptr: times multiboot_info_size * 1 db 0
+elfPreloadArea: dd 0
+elfPreloadAreaLength: dd 0
 
 farJumpRefreshSegmentRegs:
     xor ax, ax
@@ -35,30 +29,27 @@ farJumpRefreshSegmentRegs:
     mov gs, ax
 
 ; Set up the stack
-    mov sp, 0x7000
+    mov bp, 0x7000
+    mov sp, bp
 
 ; We expect disk BIOS drive number
-    cmp dl, 0x80
-    jne error
-    mov dword [multiboot_info_ptr + multiboot_info.boot_device], 0x8000ffff
 
     sti
 
-    mov byte [dap_ptr + dap.packetSize], 0x18
-    mov word [dap_ptr + dap.sectorsCount], 0x10
+    mov byte [dap_ptr + dap.packetSize], 0x10
+    mov word [dap_ptr + dap.sectorsCount], 0x2
     mov word [dap_ptr + dap.bufferSegment], 0x0
-    mov word [dap_ptr + dap.bufferOffset], kernel
-    mov byte [dap_ptr + dap.startLBA], 0x0
+    mov word [dap_ptr + dap.bufferOffset], unrealModeStage
+    mov byte [dap_ptr + dap.startLBA], 0x1
 
     call diskOps.LBARead
 
     call getMmap
 
-    jmp $
+    jmp 0x0:unrealModeStage
 
 %include "mmap.asm"
 %include "disk.asm"
-%include "gdt.asm"
 
 error:
     hlt
@@ -70,25 +61,53 @@ times 510-($-$$) db 0
 ; Boot Signature
 dw 0xaa55
 
-; Apparently Qemu's TCG only seed a sector on KVM if it has a boot signature...
-; Bug??
-kernel:
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
+unrealModeStage:
+    cli
+    mov eax, GDT32Desc
+
+    lgdt [eax]
+
+    ; set PE bit
+    mov eax, cr0
+    or al, 1
+    mov cr0, eax
+
+    jmp $ + 2
+
+    push ds
+    mov ax, 0x10
+    mov ds, ax
+
+    ; Back to Real Mode
+    and al,0xfe
+    mov  cr0, eax
+
+    pop ds
+
+    sti
+
+    ; this works
+    mov ebx, 0x120000
+    mov dword [ebx], 0x90909090
+    mov eax, dword [ebx]
+
+    mov esi, elfPreloadArea
+    mov eax, 0x8200
+    mov ebx, dword [esi]
+    cmp ebx, eax
+    jge .loadELF
+
+    mov dword [esi], eax
+    add dword [esi + 4], ebx
+    sub dword [esi + 4], eax
+
+.loadELF:
+    jmp $
+
+%include "gdt.asm"
+
 ; Pad till 510th byte
-times 1022-($-$$) db 0
+times 1024-($-$$) db 0
 
-; Boot Signature
-dw 0xaa55
-
+APEntry:
+times 512 db 0x90
