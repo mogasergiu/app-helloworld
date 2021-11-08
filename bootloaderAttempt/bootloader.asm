@@ -72,8 +72,6 @@ unrealModeStage:
     or al, 1
     mov cr0, eax
 
-    jmp $ + 2
-
     push ds
     mov ax, 0x10
     mov ds, ax
@@ -86,11 +84,6 @@ unrealModeStage:
 
     sti
 
-    ; this works
-    mov ebx, 0x120000
-    mov dword [ebx], 0x90909090
-    mov eax, dword [ebx]
-
     mov esi, elfPreloadArea
     mov eax, 0x8200
     mov ebx, dword [esi]
@@ -102,9 +95,25 @@ unrealModeStage:
     sub dword [esi + 4], eax
 
 .loadELF:
+    call loadUK
     jmp $
 
 %include "gdt.asm"
+
+ELFMetadata:
+.entry:
+    dd 0
+
+.phoff:
+    dd 0
+
+.phentsize:
+    dw 0
+
+.phnum:
+    dw 0
+
+%include "elf.asm"
 
 ; Pad till 510th byte
 times 1024-($-$$) db 0

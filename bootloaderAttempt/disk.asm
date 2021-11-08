@@ -77,6 +77,8 @@ diskOps:
 
 ; Read disk in LBA addressing manner
 .LBARead:
+    mov dl, 0x80
+
     ; First reset drive
     call .resetDisk
 
@@ -91,7 +93,9 @@ diskOps:
     ; If extensions are not supported, Carry Flag will be set
     jc error
 
-    ; dl already set by BIOS
+
+    mov dl, 0x80
+    xor ebx, ebx
     ; Select IBM/MS  Extended Read function
     mov ah, 0x42
 
