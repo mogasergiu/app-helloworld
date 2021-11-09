@@ -37,7 +37,7 @@ farJumpRefreshSegmentRegs:
     sti
 
     mov byte [dap_ptr + dap.packetSize], 0x10
-    mov word [dap_ptr + dap.sectorsCount], 0x2
+    mov word [dap_ptr + dap.sectorsCount], 0x3
     mov word [dap_ptr + dap.bufferSegment], 0x0
     mov word [dap_ptr + dap.bufferOffset], unrealModeStage
     mov byte [dap_ptr + dap.startLBA], 0x1
@@ -116,7 +116,7 @@ ELFMetadata:
 %include "elf.asm"
 
 ; Pad till 510th byte
-times 1024-($-$$) db 0
+times 1536 - ($ - $$) db 0
 
 APEntry:
 times 512 db 0x90

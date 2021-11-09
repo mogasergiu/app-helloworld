@@ -29,11 +29,12 @@ struc Elf64_Phdr
 endstruc
 
 PT_LOAD equ 0x1
+PT_TLS equ 0x7
 
 loadUK:
     mov edi, dword [elfPreloadArea]
     mov ecx, 0x1
-    mov ebx, 0x3
+    mov ebx, 0x4
     mov gs, bx
     mov esi, dap_ptr
     mov word [esi + dap.sectorsCount], cx
@@ -111,58 +112,83 @@ loadUK:
     add di, word [eax]
     add bx, word [eax]
 
+    push bp
 .beginLoadingPhdrs:
-    test dword [edi + Elf64_Phdr.p_flags], PT_LOAD
+    push cx
+    test byte [edi + Elf64_Phdr.p_type], PT_LOAD
     jz .nextPhdr
+    cmp byte [edi + Elf64_Phdr.p_type], PT_TLS
+    jg .nextPhdr
 
     mov ax, word [edi + Elf64_Phdr.p_filesz]
     mov dx, word [edi + Elf64_Phdr.p_filesz + 2]
     push bx
-    mov bx, 0x200
+    mov ebx, 0x200
     div bx
+
+    mov cx, ax
+    add cx, 0x80
+    add cx, 0x80
+    mov eax, dword [edi + Elf64_Phdr.p_offset]
+    xor edx, edx
+    div ebx
     pop bx
-    inc ax
+    add ax, 4
+    mov gs, ax
 
-    push bx
-    mov dx, ax
-    mov fs, ax
-    cmp ax, 0x80
-    jle .readDisk
-
-    mov ax, 0x80
+    xor ebp, ebp
 .readDisk:
+    mov esi, dap_ptr
     mov word [esi + dap.sectorsCount], 0x80
     mov word [esi + dap.bufferSegment], 0x0
-    mov dword [esi + dap.bufferOffset], ebx
+    mov word [esi + dap.bufferOffset], bx
     mov word [esi + dap.startLBA], gs
 
+    push dx
+    push cx
     push bx
     call diskOps.LBARead
     pop bx
+    pop cx
+    pop dx
 
-    push bp
-    mov bp, gs
-    add ax, bp
-    pop bp
+    mov ax, gs
+    add ax, 0x80
     mov gs, ax
 
-    sub dx, ax
-
 .memcpy:
-
-    push di
     push cx
-    push si
-    mov ecx, dword [edi + Elf64_Phdr.p_filesz]
-    mov edi, dword [edi + Elf64_Phdr.p_paddr]
     mov esi, ebx
-    rep movsb
-    pop si
+    add si, dx
+    mov ecx, 0x10000
+    mov eax, dword [edi + Elf64_Phdr.p_paddr]
+    add eax, ebp
+
+    push dx
+
+.memcpyContinue:
+    mov dl, byte [esi]
+    mov byte [eax], dl
+    inc esi
+    inc eax
+    dec ecx
+    test ecx, ecx
+    jnz .memcpyContinue
+
+    pop dx
     pop cx
-    pop di
+
+    add ebp, 0x10000
+    sub cx, 0x80
+    jg .readDisk
 
 .nextPhdr:
+    pop cx
     dec ecx
-    add edi, dword [edi + Elf64_Phdr.p_filesz]
+    add edi, Elf64_Phdr_size
     test ecx, ecx
     jnz .beginLoadingPhdrs
+
+    pop bp
+
+    ret
