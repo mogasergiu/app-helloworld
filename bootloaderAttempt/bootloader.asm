@@ -96,7 +96,25 @@ unrealModeStage:
 
 .loadELF:
     call loadUK
-    jmp $
+
+    cli
+
+    ; Enable the A20 line
+    in al, 0x92
+    or al, 2
+    out 0x92, al
+
+    mov eax, GDT32Desc
+
+    lgdt [eax]
+
+    ; set Protection Enable bit in Control Register 0
+    mov eax, cr0
+    or al, 1
+    mov cr0, eax
+
+    ; Jump to Protected Mode and update cs register
+    jmp 0x8:startProtectedMode
 
 %include "gdt.asm"
 
@@ -115,8 +133,64 @@ ELFMetadata:
 
 %include "elf.asm"
 
+[BITS 32]
+
+struc multibootMmapEntry
+    .size resd 1
+    .address resq 1
+    .length resq 1
+    .type resd 1
+endstruc
+
+startProtectedMode:
+    mov ax, 0x10
+    mov ds, ax
+    mov ss, ax
+    mov es, ax
+    mov gs, ax
+    mov fs, ax
+
+    mov eax, 0x2BADB002
+
+    mov edi, 0x9500
+    mov esi, multiboot_info_ptr
+    mov ecx, multiboot_info_size
+    rep movsb
+
+    mov edi, 0x9000
+    mov esi, 0x7000
+    mov ecx, 0xa8
+.fillMmap:
+    mov dword [edi + multibootMmapEntry.size], 20
+    mov ebx, dword [esi + mmapEntry.baseAddrLow]
+    mov dword [edi + multibootMmapEntry.address], ebx
+    mov ebx, dword [esi + mmapEntry.baseAddrHigh]
+    mov dword [edi + multibootMmapEntry.address + 4], ebx
+    mov ebx, dword [esi + mmapEntry.length]
+    mov dword [edi + multibootMmapEntry.length], ebx
+    mov ebx, dword [esi + mmapEntry.length + 4]
+    mov dword [edi + multibootMmapEntry.length + 4], ebx
+    mov ebx, dword [esi + mmapEntry.type]
+    mov dword [edi + multibootMmapEntry.type], ebx
+    sub ecx, 24
+    add edi, 24
+    add esi, 24
+    cmp ecx, 0
+    jg .fillMmap
+
+    mov ebx, 0x9500
+
+    mov ecx, 0x100000
+    mov ecx, dword [ecx + 28]
+
+    jmp ecx
+
+    jmp error
+    
 ; Pad till 510th byte
 times 1536 - ($ - $$) db 0
+
+[BITS 16]
 
 APEntry:
 times 512 db 0x90

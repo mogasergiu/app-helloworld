@@ -58,6 +58,6 @@ getMmap:
 
 .doneScanning:
     add byte [si], 24
-    mov dword [multiboot_info_ptr + multiboot_info.mmap_addr], MMAP_PTR
+    mov dword [multiboot_info_ptr + multiboot_info.mmap_addr], 0x9000
     ret
 

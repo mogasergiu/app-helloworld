@@ -27,4 +27,4 @@ GDT32Desc:
     dw GDT32End - GDT32Start - 1
 
 ; The starting address of the Global Descriptor Table
-    dw GDT32Start
+    dd GDT32Start
