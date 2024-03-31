@@ -1,0 +1,48 @@
+diff --git a/plat/kvm/efi.c b/plat/kvm/efi.c
+index 0cd81bf7..1df382e0 100644
+--- a/plat/kvm/efi.c
++++ b/plat/kvm/efi.c
+@@ -669,6 +669,34 @@ static void uk_efi_reset_attack_mitigation_enable(void)
+ #endif
+ }
+ 
++void *gop_fb;
++__u32 gop_xmax, gop_ymax, gop_ppsl;
++static void uk_efi_gop_fb_fetch(void)
++{
++    uk_efi_graphics_output_mode_information_t *gop_info;
++    uk_efi_graphics_output_protocol_t *gop;
++    uk_efi_uintn_t gop_info_sz;
++    uk_efi_status_t status;
++
++    status = uk_efi_bs->locate_protocol(UK_EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID,
++                                            NULL,
++                                            (void **)&gop);
++        if (unlikely(status != UK_EFI_SUCCESS))
++                uk_efi_crash("Failed to handle GOP\n");
++
++        gop_info = NULL;
++        status = gop->query_mode(gop,
++                                 gop->mode->mode,
++                                 &gop_info_sz, &gop_info);
++        if (unlikely(status != UK_EFI_SUCCESS))
++        uk_efi_crash("Failed to qeury GOP mode\n");
++
++    gop_fb = gop->mode->frame_buffer_base;
++    gop_xmax = gop->mode->info->horizontal_resolution;
++    gop_ymax = gop->mode->info->vertical_resolution;
++    gop_ppsl = gop->mode->info->pixels_per_scan_line;
++}
++
+ void __uk_efi_api __noreturn uk_efi_main(uk_efi_hndl_t self_hndl,
+ 					 struct uk_efi_sys_tbl *sys_tbl)
+ {
+@@ -681,6 +709,8 @@ void __uk_efi_api __noreturn uk_efi_main(uk_efi_hndl_t self_hndl,
+ 	 */
+ 	uk_efi_setup_bootinfo();
+ 
++	uk_efi_gop_fb_fetch();
++
+ 	/* Jump to arch specific post-EFI entry */
+ 	uk_efi_jmp_to_kern();
+ }

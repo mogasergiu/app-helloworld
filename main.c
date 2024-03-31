@@ -1,55 +1,43 @@
 #include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <uk/plat/memory.h>
+#include "bmp.h"
 
-/* Import user configuration: */
-#ifdef __Unikraft__
-#include <uk/config.h>
-#endif /* __Unikraft__ */
+volatile int c = 4;
+volatile int d;
 
-#if CONFIG_APPHELLOWORLD_SPINNER
-#include <time.h>
-#include <errno.h>
-#include "monkey.h"
+extern char *gop_fb;
+extern __u32 gop_xmax, gop_ymax, gop_ppsl;
 
-static void millisleep(unsigned int millisec)
+static void plot_pixel(int x, int y, __u32 p)
 {
-	struct timespec ts;
-	int ret;
-
-	ts.tv_sec = millisec / 1000;
-	ts.tv_nsec = (millisec % 1000) * 1000000;
-	do
-		ret = nanosleep(&ts, &ts);
-	while (ret && errno == EINTR);
+    *((__u32*)(gop_fb + 4 * gop_ppsl * y + 4 * x)) = p;
 }
-#endif /* CONFIG_APPHELLOWORLD_SPINNER */
 
 int main(int argc, char *argv[])
 {
-#if CONFIG_APPHELLOWORLD_PRINTARGS || CONFIG_APPHELLOWORLD_SPINNER
-	int i;
-#endif
+    struct ukplat_memregion_desc *initrd;
+    __u32 i, j, k, p;
+    __u32 *bitmap;
+    bmp b;
 
-	printf("Hello world!\n");
+    if (ukplat_memregion_find_initrd0(&initrd) < 0)
+        goto busy_loop;
 
-#if CONFIG_APPHELLOWORLD_PRINTARGS
-	printf("Arguments: ");
-	for (i=0; i<argc; ++i)
-		printf(" \"%s\"", argv[i]);
-	printf("\n");
-#endif /* CONFIG_APPHELLOWORLD_PRINTARGS */
 
-#if CONFIG_APPHELLOWORLD_SPINNER
-	i = 0;
-	printf("\n\n\n");
-	for (;;) {
-		i %= (monkey3_frame_count * 3);
-		printf("\r\033[2A %s \n", monkey3[i++]);
-		printf(" %s \n",          monkey3[i++]);
-		printf(" %s ",            monkey3[i++]);
-		fflush(stdout);
-		millisleep(250);
-	}
-#endif /* CONFIG_APPHELLOWORLD_SPINNER */
+    b.bf = (bmp_fhdr *)initrd->vbase;
+    b.bi = (bmp_ihdr *)(initrd->vbase + sizeof(*b.bf));
+    b.pad = b.bi->width % 4;
+    bitmap = (__u32 *)(initrd->vbase + b.bf->imageDataOffset);
 
-	return 0;
+    b.bi->height *= -1;
+    for (j = 0; j < b.bi->width; j++)
+        for (i = 0; i < b.bi->height; i++) {
+            plot_pixel(j, i, bitmap[i * b.bi->width + j]);
+        }
+busy_loop:
+    while (1);
+
+    return 0;
 }
